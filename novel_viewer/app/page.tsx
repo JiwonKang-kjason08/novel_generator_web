@@ -78,17 +78,10 @@ export default function NovelViewer() {
     
     try {
       if (isAudio) {
-        // 오디오 파일인 경우, 15분간 유효한 서명된 URL을 서버에 요청합니다.
-        const res = await fetch(`/api/gcs?action=url&path=${encodeURIComponent(filePath)}`);
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("Audio URL Fetch Error:", res.status, text);
-          alert(`오디오 파일을 불러오는 중 서버 에러가 발생했습니다. (${res.status})\n${text}`);
-          setLoading(false);
-          return;
-        }
-        const data = await res.json();
-        setAudioUrl(data.url); // 응답받은 서명된 URL을 오디오 URL 상태에 저장
+        // 오디오 파일인 경우, 500 에러를 유발할 수 있는 Signed URL 생성 대신 
+        // 서버의 스트리밍 API 엔드포인트를 오디오 소스로 직접 설정합니다.
+        const streamUrl = `/api/gcs?action=stream&path=${encodeURIComponent(filePath)}`;
+        setAudioUrl(streamUrl); // 오디오 URL 상태에 서버 스트리밍 주소 저장
       } else {
         // 텍스트 파일인 경우, 파일 내용 텍스트를 바로 가져옵니다.
         const res = await fetch(`/api/gcs?action=read&path=${encodeURIComponent(filePath)}`);

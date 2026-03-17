@@ -25,15 +25,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ content: content.toString('utf-8') });
     } 
     
+    if (action === 'stream') {
+      // 미디어 파일을 서버에서 직접 다운로드하여 클라이언트로 전달 (Signed URL 권한 문제 회피)
+      const file = bucket.file(path);
+      const [buffer] = await file.download();
+      
+      let contentType = 'audio/mpeg'; // 기본값 (mp3)
+      const lowerPath = path.toLowerCase();
+      if (lowerPath.endsWith('.wav')) contentType = 'audio/wav';
+      else if (lowerPath.endsWith('.ogg')) contentType = 'audio/ogg';
+      else if (lowerPath.endsWith('.m4a')) contentType = 'audio/mp4';
+
+      return new NextResponse(buffer as any, {
+        headers: {
+          'Content-Type': contentType,
+          'Content-Length': buffer.length.toString(),
+          'Accept-Ranges': 'bytes'
+        },
+      });
+    }
+
     if (action === 'url') {
       // 오디오, 이미지 등 미디어 파일용 서명된 URL 생성 (15분 유효)
-      const file = bucket.file(path);
-      const [url] = await file.getSignedUrl({
-        version: 'v4',
-        action: 'read',
-        expires: Date.now() + 15 * 60 * 1000,
-      });
-      return NextResponse.json({ url });
+      // 만약 500 에러(Signing IAM 권한 부족 등)가 발생하면 이 부분이 원인일 수 있습니다.
+      try {
+        const file = bucket.file(path);
+        const [url] = await file.getSignedUrl({
+          version: 'v4',
+          action: 'read',
+          expires: Date.now() + 15 * 60 * 1000,
+        });
+        return NextResponse.json({ url });
+      } catch (signError: any) {
+        console.error("Signed URL Error:", signError);
+        // 서명된 URL 생성이 실패할 경우(로컬 ADC 환경 등) 직접 스트리밍하는 방식으로 전환합니다.
+        return NextResponse.json({ 
+          error: 'Signed URL Failed', 
+          details: signError.message || String(signError) 
+        }, { status: 500 });
+      }
     }
 
     if (action === 'list') {
@@ -57,8 +87,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("GCS Error:", error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal Server Error', 
+      details: error.message || String(error) 
+    }, { status: 500 });
   }
 }
