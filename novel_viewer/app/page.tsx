@@ -41,11 +41,23 @@ export default function NovelViewer() {
      */
     const fetchList = async () => {
       setLoading(true);
-      const res = await fetch(`/api/gcs?action=list&path=${encodeURIComponent(currentPath)}`);
-      const data = await res.json();
-      setFolders(data.folders);
-      setFiles(data.files);
-      setLoading(false);
+      try {
+        const res = await fetch(`/api/gcs?action=list&path=${encodeURIComponent(currentPath)}`);
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("fetchList API Error:", res.status, text);
+          alert(`서버 에러가 발생했습니다. (${res.status})\n${text}`);
+          setLoading(false);
+          return;
+        }
+        const data = await res.json();
+        setFolders(data.folders);
+        setFiles(data.files);
+      } catch (error) {
+        console.error("fetchList Error:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchList();
@@ -64,19 +76,38 @@ export default function NovelViewer() {
     // 오디오 파일인지 판단합니다 (mp3, wav, ogg, m4a 등 대소문자 구분 없이 매칭)
     const isAudio = /\.(mp3|wav|ogg|m4a)$/i.test(filePath);
     
-    if (isAudio) {
-      // 오디오 파일인 경우, 15분간 유효한 서명된 URL을 서버에 요청합니다.
-      const res = await fetch(`/api/gcs?action=url&path=${encodeURIComponent(filePath)}`);
-      const data = await res.json();
-      setAudioUrl(data.url); // 응답받은 서명된 URL을 오디오 URL 상태에 저장
-    } else {
-      // 텍스트 파일인 경우, 파일 내용 텍스트를 바로 가져옵니다.
-      const res = await fetch(`/api/gcs?action=read&path=${encodeURIComponent(filePath)}`);
-      const data = await res.json();
-      setFileContent(data.content); // 텍스트 내용 상태에 저장
+    try {
+      if (isAudio) {
+        // 오디오 파일인 경우, 15분간 유효한 서명된 URL을 서버에 요청합니다.
+        const res = await fetch(`/api/gcs?action=url&path=${encodeURIComponent(filePath)}`);
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("Audio URL Fetch Error:", res.status, text);
+          alert(`오디오 파일을 불러오는 중 서버 에러가 발생했습니다. (${res.status})\n${text}`);
+          setLoading(false);
+          return;
+        }
+        const data = await res.json();
+        setAudioUrl(data.url); // 응답받은 서명된 URL을 오디오 URL 상태에 저장
+      } else {
+        // 텍스트 파일인 경우, 파일 내용 텍스트를 바로 가져옵니다.
+        const res = await fetch(`/api/gcs?action=read&path=${encodeURIComponent(filePath)}`);
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("Text Read Fetch Error:", res.status, text);
+          alert(`텍스트 파일을 읽는 중 서버 에러가 발생했습니다. (${res.status})\n${text}`);
+          setLoading(false);
+          return;
+        }
+        const data = await res.json();
+        setFileContent(data.content); // 텍스트 내용 상태에 저장
+      }
+    } catch (error) {
+      console.error("handleFileClick Error:", error);
+      alert(`파일 처리 중 오류가 발생했습니다.\n${error}`);
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   /**
