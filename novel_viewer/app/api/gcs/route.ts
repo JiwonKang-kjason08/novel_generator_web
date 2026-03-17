@@ -3,9 +3,11 @@
 import { GetFilesResponse, Storage as GCStorage} from '@google-cloud/storage';
 import { NextResponse, NextRequest } from 'next/server';
 
-const storage = new GCStorage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-});
+const storageOptions = process.env.GCP_SERVICE_ACCOUNT_JSON
+  ? { credentials: JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON) } // 배포 환경
+  : { keyFilename: 'config.json' }; // 로컬 환경
+
+const storage = new GCStorage(storageOptions);
 
 export async function GET(request: NextRequest) {
   const bucketName = process.env.GCS_BUCKET_NAME!;
