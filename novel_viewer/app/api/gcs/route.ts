@@ -25,6 +25,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ content: content.toString('utf-8') });
     } 
     
+    if (action === 'url') {
+      // 오디오, 이미지 등 미디어 파일용 서명된 URL 생성 (15분 유효)
+      const file = bucket.file(path);
+      const [url] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: Date.now() + 15 * 60 * 1000,
+      });
+      return NextResponse.json({ url });
+    }
+
     if (action === 'list') {
       // 폴더 및 파일 목록 조회
       // delimiter '/'를 사용해야 하위 폴더 내용까지 한 번에 가져오지 않습니다.
